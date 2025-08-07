@@ -35,25 +35,27 @@ class Database:
                     username VARCHAR(255),
                     first_name VARCHAR(255),
                     last_name VARCHAR(255),
+                    profile_photo_url VARCHAR(512),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             logger.info("Таблица users создана или уже существует")
     
-    async def add_user(self, user_id: int, username: str = None, first_name: str = None, last_name: str = None):
+    async def add_user(self, user_id: int, username: str = None, first_name: str = None, last_name: str = None, profile_photo_url: str = None):
         """Добавление или обновление пользователя"""
         async with self.pool.acquire() as connection:
             await connection.execute('''
-                INSERT INTO users (user_id, username, first_name, last_name, updated_at)
-                VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                INSERT INTO users (user_id, username, first_name, last_name, profile_photo_url, updated_at)
+                VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id) 
                 DO UPDATE SET 
                     username = EXCLUDED.username,
                     first_name = EXCLUDED.first_name,
                     last_name = EXCLUDED.last_name,
+                    profile_photo_url = EXCLUDED.profile_photo_url,
                     updated_at = CURRENT_TIMESTAMP
-            ''', user_id, username, first_name, last_name)
+            ''', user_id, username, first_name, last_name, profile_photo_url)
             logger.info(f"Пользователь {user_id} добавлен/обновлен в базе данных")
     
     async def get_user(self, user_id: int):

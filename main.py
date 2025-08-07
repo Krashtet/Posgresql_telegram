@@ -12,20 +12,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+async def get_profile_photo_url(context, user_id: int):
+    """Получение ссылки на фото профиля пользователя"""
+    try:
+        # 1. Запрашиваем фото профиля у Telegram
+        photos = await context.bot.get_user_profile_photos(user_id, limit=1)
+         # 2. Проверяем, есть ли фото
+        if photos.total_count > 0:
+            # 3. Берем первое (самое большое) фото
+            file_id = photos.photos[0][0].file_id
+            # 4. Получаем ссылку на файл
+            file = await context.bot.get_file(file_id)
+            return file.file_path
+        else:
+            return None
+    except Exception as e:
+        logger.warning(f"Не удалось получить фото профиля для пользователя {user_id}: {e}")
+        return None
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user = update.effective_user
+    
+    # Получаем ссылку на фото профиля
+    profile_photo_url = await get_profile_photo_url(context, user.id)
     
     # Сохраняем информацию о пользователе в базу данных
     await db.add_user(
         user_id=user.id,
         username=user.username,
         first_name=user.first_name,
-        last_name=user.last_name
+        last_name=user.last_name,
+        profile_photo_url=profile_photo_url
     )
     
+    photo_text = "профиль с фото" if profile_photo_url else "профиль без фото"
     await update.message.reply_text(
-        f"Привет, {user.first_name}! Я сохранил твою информацию в базе данных.\n"
+        f"Привет, {user.first_name}! Я сохранил твою информацию в базе данных {photo_text}.\n"
         f"Твой ID: {user.id}"
     )
 
@@ -46,12 +69,14 @@ async def my_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = await db.get_user(user_id)
     
     if user_data:
+        photo_info = f"Фото профиля: {user_data['profile_photo_url']}" if user_data['profile_photo_url'] else "Фото профиля: не указано"
         info_text = f"""
 Твоя информация в базе данных:
 ID: {user_data['user_id']}
 Username: @{user_data['username'] or 'не указан'}
 Имя: {user_data['first_name'] or 'не указано'}
 Фамилия: {user_data['last_name'] or 'не указана'}
+{photo_info}
 Зарегистрирован: {user_data['created_at'].strftime('%d.%m.%Y %H:%M')}
 Обновлен: {user_data['updated_at'].strftime('%d.%m.%Y %H:%M')}
         """
@@ -60,23 +85,30 @@ Username: @{user_data['username'] or 'не указан'}
     
     await update.message.reply_text(info_text)
 
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать статистику пользователей (только для разработчика)"""
     # Здесь можно добавить проверку на права администратора
     users = await db.get_all_users()
-    stats_text = f"Всего пользователей в базе данных: {len(users)}"
+    users_with_photo = sum(1 for user in users if user['profile_photo_url'])
+    stats_text = f"Всего пользователей в базе данных: {len(users)}\nПользователей с фото профиля: {users_with_photo}"
     await update.message.reply_text(stats_text)
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик обычных сообщений"""
     user = update.effective_user
+    
+    # Получаем ссылку на фото профиля
+    profile_photo_url = await get_profile_photo_url(context, user.id)
     
     # Обновляем информацию о пользователе при каждом сообщении
     await db.add_user(
         user_id=user.id,
         username=user.username,
         first_name=user.first_name,
-        last_name=user.last_name
+        last_name=user.last_name,
+        profile_photo_url=profile_photo_url
     )
     
     await update.message.reply_text(
