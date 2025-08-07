@@ -90,6 +90,7 @@ async def main():
     
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
+    print("Application created:", application)
     
     # Добавляем обработчики
     application.add_handler(CommandHandler("start", start))
@@ -103,9 +104,7 @@ async def main():
     await application.run_polling()
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен")
-    finally:
-        asyncio.run(db.disconnect()) 
+    import nest_asyncio
+    nest_asyncio.apply()
+    import asyncio
+    asyncio.get_event_loop().run_until_complete(main()) 
